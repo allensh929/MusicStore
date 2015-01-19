@@ -20,10 +20,10 @@ namespace MusicStore.Models
         {
             using (var db = serviceProvider.GetService<MusicStoreContext>())
             {
-                var sqlServerDataStore = db.Configuration.DataStore as SqlServerDataStore;
-                if (sqlServerDataStore != null)
+                var sqlServerDatabase = db.Database as SqlServerDatabase;
+                if (sqlServerDatabase != null)
                 {
-                    if (await db.Database.EnsureCreatedAsync())
+                    if (await sqlServerDatabase.EnsureCreatedAsync())
                     {
                         await InsertTestData(serviceProvider);
                         await CreateAdminUser(serviceProvider);
@@ -56,7 +56,7 @@ namespace MusicStore.Models
                 user = new ApplicationUser { UserName = settings.DefaultAdminUsername };
                 await userManager.CreateAsync(user, settings.DefaultAdminPassword);
                 await userManager.AddToRoleAsync(user, adminRole);
-                await userManager.AddClaimAsync(user, new Claim("ManageStore", "Allowed"));
+                await userManager.AddClaimAsync(user, new Claim("app-ManageStore", "Allowed"));
             }
         }
 
@@ -86,7 +86,7 @@ namespace MusicStore.Models
             {
                 foreach (var item in entities)
                 {
-                    db.ChangeTracker.Entry(item).State = existingData.Any(g => propertyToMatch(g).Equals(propertyToMatch(item)))
+                    db.Entry(item).State = existingData.Any(g => propertyToMatch(g).Equals(propertyToMatch(item)))
                         ? EntityState.Modified
                         : EntityState.Added;
                 }

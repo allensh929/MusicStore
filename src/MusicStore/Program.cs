@@ -1,9 +1,11 @@
-﻿using Microsoft.Framework.ConfigurationModel;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.AspNet.Hosting;
+using Microsoft.Framework.ConfigurationModel;
 using Microsoft.Framework.DependencyInjection;
 using Microsoft.Framework.DependencyInjection.Fallback;
-using Microsoft.AspNet.Hosting;
-using System;
-using System.Threading.Tasks;
+using Microsoft.Framework.Runtime;
 
 namespace MusicStore
 {
@@ -26,10 +28,8 @@ namespace MusicStore
             var config = new Configuration();
             config.AddCommandLine(args);
 
-            var serviceCollection = new ServiceCollection();
-            serviceCollection.Add(HostingServices.GetDefaultServices(config));
-            serviceCollection.AddInstance<IHostingEnvironment>(new HostingEnvironment() { WebRoot = "wwwroot" });
-            var services = serviceCollection.BuildServiceProvider(_hostServiceProvider);
+            var serviceCollection = HostingServices.Create(_hostServiceProvider);
+            var services = serviceCollection.BuildServiceProvider();
 
             var context = new HostingContext()
             {

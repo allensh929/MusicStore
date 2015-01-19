@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Net.Http;
+using System.Threading;
 using Xunit;
 
 namespace E2ETests
@@ -16,7 +18,7 @@ namespace E2ETests
         [InlineData(ServerType.WebListener, KreFlavor.DesktopClr, KreArchitecture.amd64, "http://localhost:5002/", false)]
         //https://github.com/aspnet/KRuntime/issues/642
         //[InlineData(ServerType.Helios, KreFlavor.CoreClr, KreArchitecture.amd64, "http://localhost:5001/", false)]
-        [InlineData(ServerType.Kestrel, KreFlavor.DesktopClr, KreArchitecture.x86, "http://localhost:5004/", true)]
+        [InlineData(ServerType.Kestrel, KreFlavor.Mono, KreArchitecture.x86, "http://localhost:5004/", true)]
         public void PublishAndRunTests(ServerType serverType, KreFlavor kreFlavor, KreArchitecture architecture, string applicationBaseUrl, bool RunTestOnMono = false)
         {
             Console.WriteLine("Variation Details : HostType = {0}, KreFlavor = {1}, Architecture = {2}, applicationBaseUrl = {3}", serverType, kreFlavor, architecture, applicationBaseUrl);
@@ -54,11 +56,34 @@ namespace E2ETests
                 httpClientHandler = new HttpClientHandler() { UseDefaultCredentials = true };
                 httpClient = new HttpClient(httpClientHandler) { BaseAddress = new Uri(applicationBaseUrl) };
 
+                HttpResponseMessage response = null;
+                string responseContent = null;
+                var initializationCompleteTime = DateTime.MinValue;
+
                 //Request to base address and check if various parts of the body are rendered & measure the cold startup time.
-                var response = httpClient.GetAsync(string.Empty).Result;
-                var responseContent = response.Content.ReadAsStringAsync().Result;
-                var initializationCompleteTime = DateTime.Now;
-                Console.WriteLine("[Time]: Approximate time taken for application initialization : '{0}' seconds", (initializationCompleteTime - testStartTime).TotalSeconds);
+                //Add retry logic since tests are flaky on mono due to connection issues
+                for (int retryCount = 0; retryCount < 3; retryCount++)
+                {
+                    try
+                    {
+                        response = httpClient.GetAsync(string.Empty).Result;
+                        responseContent = response.Content.ReadAsStringAsync().Result;
+                        initializationCompleteTime = DateTime.Now;
+                        Console.WriteLine("[Time]: Approximate time taken for application initialization : '{0}' seconds", (initializationCompleteTime - testStartTime).TotalSeconds);
+                        break; //Went through successfully
+                    }
+                    catch (AggregateException exception)
+                    {
+                        // Both type exceptions thrown by Mono which are resolved by retry logic
+                        if (exception.InnerException is HttpRequestException || exception.InnerException is WebException)
+                        {
+                            Console.WriteLine("Failed to complete the request with error: {0}", exception.ToString());
+                            Console.WriteLine("Retrying request..");
+                            Thread.Sleep(1 * 1000); //Wait for a second before retry
+                        }
+                    }
+                }
+
                 VerifyHomePage(response, responseContent, true);
 
                 //Static files are served?

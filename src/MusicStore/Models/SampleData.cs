@@ -17,23 +17,29 @@ namespace MusicStore.Models
         const string defaultAdminUserName = "DefaultAdminUserName";
         const string defaultAdminPassword = "defaultAdminPassword";
 
-        public static async Task InitializeMusicStoreDatabaseAsync(IServiceProvider serviceProvider)
+        public static async Task InitializeMusicStoreDatabaseAsync(IServiceProvider serviceProvider, bool createUsers = true)
         {
             using (var db = serviceProvider.GetService<MusicStoreContext>())
             {
-                var sqlServerDataStore = db.Configuration.DataStore as SqlServerDataStore;
-                if (sqlServerDataStore != null)
+                var sqlServerDatabase = db.Database as SqlServerDatabase;
+                if (sqlServerDatabase != null)
                 {
-                    if (await db.Database.EnsureCreatedAsync())
+                    if (await sqlServerDatabase.EnsureCreatedAsync())
                     {
                         await InsertTestData(serviceProvider);
-                        await CreateAdminUser(serviceProvider);
+                        if (createUsers)
+                        {
+                            await CreateAdminUser(serviceProvider);
+                        }
                     }
                 }
                 else
                 {
                     await InsertTestData(serviceProvider);
-                    await CreateAdminUser(serviceProvider);
+                    if (createUsers)
+                    {
+                        await CreateAdminUser(serviceProvider);
+                    }
                 }
             }
         }
@@ -64,7 +70,7 @@ namespace MusicStore.Models
             {
                 foreach (var item in entities)
                 {
-                    db.ChangeTracker.Entry(item).State = existingData.Any(g => propertyToMatch(g).Equals(propertyToMatch(item)))
+                    db.Entry(item).State = existingData.Any(g => propertyToMatch(g).Equals(propertyToMatch(item)))
                         ? EntityState.Modified
                         : EntityState.Added;
                 }

@@ -152,11 +152,11 @@ namespace E2ETests
                 throw new Exception("KRE not detected on the machine.");
             }
 
-            var monoPath = Path.Combine(kreBin, "mono");
+            var monoPath = "mono";
             var klrMonoManaged = Path.Combine(kreBin, "klr.mono.managed.dll");
             var applicationHost = Path.Combine(kreBin, "Microsoft.Framework.ApplicationHost");
 
-            Console.WriteLine(string.Format("Executing command: {0} {1} {3} {4}", monoPath, klrMonoManaged, startParameters.ApplicationPath, applicationHost, startParameters.ServerType.ToString()));
+            Console.WriteLine(string.Format("Executing command: {0} {1} {2} {3} {4}", monoPath, klrMonoManaged, startParameters.ApplicationPath, applicationHost, startParameters.ServerType.ToString()));
 
             var startInfo = new ProcessStartInfo
             {
@@ -168,7 +168,7 @@ namespace E2ETests
 
             var hostProcess = Process.Start(startInfo);
             Console.WriteLine("Started {0}. Process Id : {1}", hostProcess.MainModule.FileName, hostProcess.Id);
-            Thread.Sleep(5 * 1000);
+            Thread.Sleep(15 * 1000);
 
             //Clear the appbase so that it does not create issues with successive runs
             Environment.SetEnvironmentVariable("KRE_APPBASE", string.Empty);

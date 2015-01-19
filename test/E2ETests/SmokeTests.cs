@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Net.Http;
+using System.Threading;
 using Xunit;
 
 namespace E2ETests
@@ -66,11 +68,32 @@ namespace E2ETests
                 httpClientHandler = new HttpClientHandler();
                 httpClient = new HttpClient(httpClientHandler) { BaseAddress = new Uri(applicationBaseUrl) };
 
+                HttpResponseMessage response = null;
+                string responseContent = null;
+                var initializationCompleteTime = DateTime.MinValue;
+
                 //Request to base address and check if various parts of the body are rendered & measure the cold startup time.
-                var response = httpClient.GetAsync(string.Empty).Result;
-                var responseContent = response.Content.ReadAsStringAsync().Result;
-                var initializationCompleteTime = DateTime.Now;
-                Console.WriteLine("[Time]: Approximate time taken for application initialization : '{0}' seconds", (initializationCompleteTime - testStartTime).TotalSeconds);
+                for (int retryCount = 0; retryCount < 3; retryCount++)
+                {
+                    try
+                    {
+                        response = httpClient.GetAsync(string.Empty).Result;
+                        responseContent = response.Content.ReadAsStringAsync().Result;
+                        initializationCompleteTime = DateTime.Now;
+                        Console.WriteLine("[Time]: Approximate time taken for application initialization : '{0}' seconds", (initializationCompleteTime - testStartTime).TotalSeconds);
+                        break; //Went through successfully
+                    }
+                    catch (AggregateException exception)
+                    {
+                        if (exception.InnerException is HttpRequestException || exception.InnerException is WebException)
+                        {
+                            Console.WriteLine("Failed to complete the request with error: {0}", exception.ToString());
+                            Console.WriteLine("Retrying request..");
+                            Thread.Sleep(1 * 1000); //Wait for a second before retry
+                        }
+                    }
+                }
+
                 VerifyHomePage(response, responseContent);
 
                 //Verify the static file middleware can serve static content
@@ -125,6 +148,9 @@ namespace E2ETests
 
                 //Get details of the album
                 VerifyAlbumDetails(albumId, albumName);
+
+                //Get the non-admin view of the album.
+                GetAlbumDetailsFromStore(albumId, albumName);
 
                 //Add an album to cart and checkout the same
                 AddAlbumToCart(albumId, albumName);

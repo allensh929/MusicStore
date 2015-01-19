@@ -2,7 +2,6 @@ using System;
 using Microsoft.AspNet.Builder;
 using Microsoft.AspNet.Diagnostics;
 using Microsoft.AspNet.Routing;
-using Microsoft.Data.Entity;
 using Microsoft.Framework.ConfigurationModel;
 using Microsoft.Framework.DependencyInjection;
 using MusicStore.Models;
@@ -11,7 +10,6 @@ using Microsoft.AspNet.Server.WebListener;
 using System.Security.Claims;
 using System.Security.Principal;
 using Microsoft.Framework.Cache.Memory;
-using Microsoft.AspNet.Identity;
 
 namespace MusicStore
 {
@@ -30,6 +28,17 @@ namespace MusicStore
     /// </summary>
     public class StartupNtlmAuthentication
     {
+        public StartupNtlmAuthentication()
+        {
+            //Below code demonstrates usage of multiple configuration sources. For instance a setting say 'setting1' is found in both the registered sources, 
+            //then the later source will win. By this way a Local config can be overridden by a different setting while deployed remotely.
+            Configuration = new Configuration()
+                        .AddJsonFile("config.json")
+                        .AddEnvironmentVariables(); //All environment variables in the process's context flow in as configuration values.
+        }
+
+        public IConfiguration Configuration { get; private set; }
+
         public void Configure(IApplicationBuilder app)
         {
             //Set up NTLM authentication for WebListener like below. 
@@ -56,12 +65,6 @@ namespace MusicStore
                 await next.Invoke();
             });
 
-            //Below code demonstrates usage of multiple configuration sources. For instance a setting say 'setting1' is found in both the registered sources, 
-            //then the later source will win. By this way a Local config can be overridden by a different setting while deployed remotely.
-            var configuration = new Configuration()
-                        .AddJsonFile("config.json")
-                        .AddEnvironmentVariables(); //All environment variables in the process's context flow in as configuration values.
-
             //Error page middleware displays a nice formatted HTML page for any unhandled exceptions in the request pipeline.
             //Note: ErrorPageOptions.ShowAll to be used only at development time. Not recommended for production.
             app.UseErrorPage(ErrorPageOptions.ShowAll);
@@ -69,15 +72,9 @@ namespace MusicStore
             app.UseServices(services =>
             {
                 // Add EF services to the services container
-                services.AddEntityFramework()
+                services.AddEntityFramework(Configuration)
                         .AddSqlServer()
-                        .AddDbContext<MusicStoreContext>(options =>
-                        {
-                            options.UseSqlServer(configuration.Get("Data:DefaultConnection:ConnectionString"));
-                        });
-
-                // Add Identity services to the services container
-                services.AddDefaultIdentity<MusicStoreContext, ApplicationUser, IdentityRole>(configuration.GetSubKey("Identity"));
+                        .AddDbContext<MusicStoreContext>();
 
                 // Add MVC services to the services container
                 services.AddMvc();
@@ -114,7 +111,7 @@ namespace MusicStore
             });
 
             //Populates the MusicStore sample data
-            SampleData.InitializeMusicStoreDatabaseAsync(app.ApplicationServices).Wait();
+            SampleData.InitializeMusicStoreDatabaseAsync(app.ApplicationServices, false).Wait();
         }
     }
 }
